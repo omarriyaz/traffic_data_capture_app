@@ -15,25 +15,34 @@ import random                                              # generate random num
 import time                                                # needed to record when stuff happened
 import json                                                # support for json encoding
 import sys                                                 # needed for agument handling
+from collections import Counter                            # for counting occurances of values
+
+
 
 ### Database access wrappers
 
 def do_database_execute(op):
   """Execute an SQL command that is not expected to return any rows."""
+  
   print(op)
+
   try:
     db = sqlite3.connect('database.db') # DO NOT CHANGE THE NAME OF THE DATABASE
     cursor = db.cursor()
     cursor.execute(op)
     db.commit()
+  
   except Exception as e:
     db.rollback()
+  
   finally:
     db.close()
 
 def do_database_fetchone(op):
   """Execute an SQL command that returns at most a single row."""
+  
   print(op)
+  
   try:
     db = sqlite3.connect('database.db') # DO NOT CHANGE THE NAME OF THE DATABASE
     cursor = db.cursor()
@@ -42,13 +51,16 @@ def do_database_fetchone(op):
     print(result)
     db.close()
     return result
+  
   except Exception as e:
     print(e)
     return None
 
 def do_database_fetchall(op):
   """Execute an SQL command that can return any number of rows, including none."""
+  
   print(op)
+  
   try:
     db = sqlite3.connect('database.db') # DO NOT CHANGE THE NAME OF THE DATABASE
     cursor = db.cursor()
@@ -57,9 +69,11 @@ def do_database_fetchall(op):
     print(result)
     db.close()
     return result
+  
   except Exception as e:
     print(e)
     return None
+
 
 
 ### The following build_ functions return the responses that the front end client understands.
@@ -68,60 +82,78 @@ def do_database_fetchall(op):
 def build_response_message(code, text):
     """This function builds a message response that displays a message
        to the user on the web page. It also returns an error code."""
+    
     return {"type":"message","code":code, "text":text}
 
 def build_response_vcount(vtype,total):
     """This function builds a summary response for a vehicle type"""
+    
     return {"type":"vcount", "vtype":vtype, "count":total}
 
 def build_response_location(id, name):
     """This function builds an activity response that contains the id and name of an activity type,"""
+    
     return {"type":"location", "id":id, "name":name}
 
 def build_response_total(total):
     """The number of vehicles that have been seen in this session."""
+    
     return {"type":"total", "total":total}
 
 def build_response_redirect(where):
     """This function builds the page redirection response
        It indicates which page the client should fetch.
        If this action is used, it should be the only response provided."""
+    
     return {"type":"redirect", "where":where}
+
+
 
 ### Some utility code
 
 def random_digits(n):
     """Return a random string of digits of size n"""
+    
     range_start = 10**(n-1)
     range_end = (10**n)-1
     return random.randint(range_start, range_end)
 
 def timestamp():
     """Return number of seconds since the start of the epoch"""
+    
     return int(time.time())
 
 def location_response(sessionid):
     """Work out how many vehicles we've seen in this session, regardless of location."""
+    
     tot_query = f"SELECT sum(mode) FROM traffic WHERE sessionid = {sessionid} GROUP BY sessionid"
     total = do_database_fetchone(tot_query)
+    
     if total:
       return build_response_total(total[0])
+    
     else:
       return build_response_total(0)
 
 def handle_validate(iuser, imagic):
   """Check if the supplied userid and magic match a currently active session and return the sessionid if they do, otherwise 0"""
+  
   result = do_database_fetchone('SELECT * FROM session WHERE session.end=0 AND session.userid="'+iuser+'" AND session.magic="'+imagic+'"')
+  
   if (result != None):
     return result[0]
+  
   else:
     return 0 #not a valid sessionid
+
+
 
 ### The main command handler functions. The are the functions invoked when the json requests
 ### includes a specific command.
 
 def handle_login_request(iuser, imagic, content):
     """Deal with a login request"""
+    
     response = []
 
     if 'username' in content and 'password' in content:
@@ -150,6 +182,7 @@ def handle_login_request(iuser, imagic, content):
 
             iuser = user_result[0] if user_result else ''
             imagic = magic if user_result else ''
+        
         else:
             response.append(build_response_message(103, 'Invalid credentials. One or both of Username and Password are incorrect or empty.'))
             return ['','', response]
@@ -157,22 +190,24 @@ def handle_login_request(iuser, imagic, content):
     else:
         response.append(build_response_message(200, 'Missing username or password field in request.'))
         return ['','', response]
-
     
     return [iuser, imagic, response]
 
 def handle_logout_request(iuser, imagic, parameters):
     """Deal with a logout request"""
+    
     response = []
     
     if imagic and iuser :
         end = timestamp()
+        
         # End the user's session by removing the session record
         end_query = f"UPDATE session SET end={end} WHERE userid = {iuser} AND magic='{imagic}' AND end=0"
         do_database_execute(end_query)
 
         # Return a message indicating successful logout
         response.append(build_response_redirect('/logout.html'))  # Redirect to the index page after logout
+    
     else:
         response.append(build_response_message(110, 'User is not logged in'))
 
@@ -181,11 +216,14 @@ def handle_logout_request(iuser, imagic, parameters):
 
 def handle_location_request(iuser, imagic, content):
     """Return a list of current locations."""
+    
     response = []
     sessionid = handle_validate(iuser, imagic)  
+    
     if sessionid == 0:
         response.append(build_response_redirect('/login.html'))
         return ['', '', response]
+    
     else:
         loc_query = f"SELECT * FROM locations ORDER BY locationid"
         locs = do_database_fetchall(loc_query)
@@ -198,37 +236,45 @@ def handle_location_request(iuser, imagic, content):
         return [iuser, imagic, response]
 
 
+
 ## The user has requested a vehicle be added to the count
 ## content['location'] the location to be recorded
 ## content['occupancy'] the occupant count to be recorded
 ## content['type'] the type to be recorded
 ## Return the username, magic identifier (these may be empty strings) and the response action set.
+
 def handle_add_request(iuser, imagic, content):
   """Adds a vehicle to the traffic record."""
+  
   response  = []
   sessionid = handle_validate(iuser, imagic)
+  
   if (sessionid == 0):
     response.append(build_response_redirect('/login.html'))
     return ['', '', response]
+  
   else:
 
     ## a valid session so process the addition of the entry.
-
     # First check that all the arguments are present
+    
     try:
       location = content['location']
+    
     except:
       response.append(build_response_message(201,"Location field missing from request."))
       return [iuser,imagic, response]
 
     try:
       vtype = content['type']
+    
     except:
       response.append(build_response_message(202,"Type field missing from request."))
       return [iuser,imagic, response]
 
     try:
       occupancy = content['occupancy']
+    
     except:
       response.append(build_response_message(203,"Occupancy field missing from request."))
       return [iuser,imagic, response]
@@ -249,6 +295,7 @@ def handle_add_request(iuser, imagic, content):
       vtype = int(vtype)
       if vtype<1 or vtype>8:
         raise Exception("Out of range")
+    
     except:
       response.append(build_response_message(102,"Type field invalid."))
       return [iuser,imagic, response]
@@ -257,6 +304,7 @@ def handle_add_request(iuser, imagic, content):
       occupancy = int(occupancy)
       if occupancy<1 or occupancy>4:
         raise Exception("Out of range")
+    
     except:
       response.append(build_response_message(103,"Occupancy field invalid."))
       return [iuser,imagic, response]
@@ -273,18 +321,110 @@ def handle_add_request(iuser, imagic, content):
 
   return [iuser,imagic,response]
 
+
+
 ## The user has requested a vehicle be undone from the count
 ## content['location'] the location to be undone
 ## content['occupancy'] the occupant count to be undone
 ## content['type'] the type to be undone
 ## Return the username, magic identifier (these may be empty  strings) and the response action set.
+
 def handle_undo_request(iuser, imagic, content):
   response  = []
   sessionid = handle_validate(iuser, imagic)
+  
   if (sessionid == 0):
     response.append(build_response_redirect('/login.html'))
     return ['', '', response]
+  
   else:
+    
+    # First check that all the arguments are present
+    
+    try:
+      location = content['location']
+    
+    except:
+      response.append(build_response_message(201,"Location field missing from request."))
+      return [iuser,imagic, response]
+
+    try:
+      vtype = content['type']
+    
+    except:
+      response.append(build_response_message(202,"Type field missing from request."))
+      return [iuser,imagic, response]
+
+    try:
+      occupancy = content['occupancy']
+    
+    except:
+      response.append(build_response_message(203,"Occupancy field missing from request."))
+      return [iuser,imagic, response]
+
+    # Then check that they are valid values
+    try:
+      location = int(location)
+
+      loc_query = f"SELECT * FROM locations WHERE locationid = {location}"
+      loc_result = do_database_fetchone(loc_query)
+      location = loc_result[0] # should fail if we could n't find it.
+
+    except:
+      response.append(build_response_message(101,"Location field invalid."))
+      return [iuser,imagic, response]
+
+    try:
+      vtype = int(vtype)
+      if vtype<1 or vtype>8:
+        raise Exception("Out of range")
+    
+    except:
+      response.append(build_response_message(102,"Type field invalid."))
+      return [iuser,imagic, response]
+
+    try:
+      occupancy = int(occupancy)
+      if occupancy<1 or occupancy>4:
+        raise Exception("Out of range")
+    
+    except:
+      response.append(build_response_message(103,"Occupancy field invalid."))
+      return [iuser,imagic, response]
+    
+    # Everything looks good, no check if a record exists to undo, and that it does not have a corresponding undo record.
+
+    add_query = f"SELECT * FROM traffic WHERE sessionid={sessionid} AND type={vtype} AND locationid = {location} AND occupancy = {occupancy} AND mode = 1"
+    add_fetchall = do_database_fetchall(add_query)
+
+    undo_query = f"SELECT * FROM traffic WHERE sessionid={sessionid} AND type={vtype} AND locationid = {location} AND occupancy = {occupancy} AND mode = -1"
+    undo_fetchall = do_database_fetchall(undo_query)
+
+    # Check if there is a record to undo
+    if len(add_fetchall) > len(undo_fetchall):
+        
+        # Count occurrences of each timestamp in add and undo records
+        add_timestamp_counts = {}
+        undo_timestamp_counts = {}
+
+        add_timestamp_counts = Counter(record[2] for record in add_fetchall)
+        undo_timestamp_counts = Counter(record[2] for record in undo_fetchall)
+
+        # Find the earliest add timestamp that has fewer undos than adds
+        for add_timestamp, add_count in add_timestamp_counts.items():
+            undo_count = undo_timestamp_counts.get(add_timestamp, 0)
+            if undo_count < add_count:
+                undo_now = add_timestamp
+                break
+        
+        undo_query = f"INSERT INTO traffic (recordid, sessionid, time, type, locationid, occupancy, mode) VALUES (NULL, {sessionid},{undo_now},{vtype},{location},{occupancy},-1)"
+        do_database_execute(undo_query)
+        response.append(build_response_message(0,"Vehicle undone for " + loc_result[1]))
+    
+    else:
+      response.append(build_response_message(104,"No record to undo."))
+
+
 
     ## CODE NEEDED HERE
     ##
@@ -292,11 +432,11 @@ def handle_undo_request(iuser, imagic, content):
     ## Otherwise, report an error that there is no match.
     ## Undoing does not delete an entry. It adds an equal but opposite entry
 
-    ## check for a valid session, if so process the addition of the entry.
+    ## check for a valid session, if so process the addition of the entry. DONE
 
-    # First check that all the arguments are present
+    # First check that all the arguments are present DONE
  
-    # Then check that they are valid values
+    # Then check that they are valid values DONE
 
     # Update database
 
