@@ -1,21 +1,13 @@
-#!/usr/bin/env python
-
-# This is a simple web server for a traffic counting application.
-# It's your job to extend it by adding the missing backend functionality
-# You should only need to extend this file. The client side code
-# (html, javascript and css) is complete and does not require editing
-# or detailed understanding.
-
-# import the various libraries needed
-import http.cookies as Cookie                              # some cookie handling support
-from http.server import BaseHTTPRequestHandler, HTTPServer # the heavy lifting of the web server
-import urllib                                              # some url parsing support
-import sqlite3                                             # sql database
-import random                                              # generate random numbers
-import time                                                # needed to record when stuff happened
-import json                                                # support for json encoding
-import sys                                                 # needed for agument handling
-from collections import Counter                            # for counting occurances of values
+# Import the various libraries needed
+import http.cookies as Cookie                              # Some cookie handling support
+from http.server import BaseHTTPRequestHandler, HTTPServer # The heavy lifting of the web server
+import urllib                                              # Some url parsing support
+import sqlite3                                             # SQL database
+import random                                              # Generate random numbers
+import time                                                # Needed to record when stuff happened
+import json                                                # Support for json encoding
+import sys                                                 # Needed for agument handling
+from collections import Counter                            # For counting occurances of values
 
 
 
@@ -23,11 +15,11 @@ from collections import Counter                            # for counting occura
 
 def do_database_execute(op):
   """Execute an SQL command that is not expected to return any rows."""
-  
+ 
   print(op)
 
   try:
-    db = sqlite3.connect('database.db') # DO NOT CHANGE THE NAME OF THE DATABASE
+    db = sqlite3.connect('database.db')
     cursor = db.cursor()
     cursor.execute(op)
     db.commit()
@@ -44,7 +36,7 @@ def do_database_fetchone(op):
   print(op)
   
   try:
-    db = sqlite3.connect('database.db') # DO NOT CHANGE THE NAME OF THE DATABASE
+    db = sqlite3.connect('database.db')
     cursor = db.cursor()
     cursor.execute(op)
     result = cursor.fetchone()
@@ -62,7 +54,7 @@ def do_database_fetchall(op):
   print(op)
   
   try:
-    db = sqlite3.connect('database.db') # DO NOT CHANGE THE NAME OF THE DATABASE
+    db = sqlite3.connect('database.db')
     cursor = db.cursor()
     cursor.execute(op)
     result = cursor.fetchall()
@@ -83,9 +75,9 @@ def build_response_message(code, text):
     """This function builds a message response that displays a message
        to the user on the web page. It also returns an error code."""
     
-    return {"type":"message","code":code, "text":text}
+    return {"type":"message", "code":code, "text":text}
 
-def build_response_vcount(vtype,total):
+def build_response_vcount(vtype, total):
     """This function builds a summary response for a vehicle type"""
     
     return {"type":"vcount", "vtype":vtype, "count":total}
@@ -138,18 +130,18 @@ def location_response(sessionid):
 def handle_validate(iuser, imagic):
   """Check if the supplied userid and magic match a currently active session and return the sessionid if they do, otherwise 0"""
   
-  result = do_database_fetchone('SELECT * FROM session WHERE session.end=0 AND session.userid="'+iuser+'" AND session.magic="'+imagic+'"')
+  result = do_database_fetchone('SELECT * FROM session WHERE session.end=0 AND session.userid="' + iuser + '" AND session.magic="' + imagic + '"')
   
   if (result != None):
     return result[0]
   
   else:
-    return 0 #not a valid sessionid
+    return 0
 
 
 
 ### The main command handler functions. The are the functions invoked when the json requests
-### includes a specific command.
+### Includes a specific command.
 
 def handle_login_request(iuser, imagic, content):
     """Deal with a login request"""
@@ -166,15 +158,15 @@ def handle_login_request(iuser, imagic, content):
 
         if user_result:
             # Generate a random magic identifier for the session
-            magic = str(random_digits(8)) #we should really test its not present.
+            magic = str(random_digits(8))
             start = timestamp()
 
-            # close any existing sessions but updating any zero end times to the current time
+            # Close any existing sessions but updating any zero end times to the current time
             end_query = f"UPDATE session SET end = {start} WHERE userid = {user_result[0]} AND end=0"
             do_database_execute(end_query)
 
             # Create a new session record in the session table
-            session_query = f"INSERT INTO session (sessionid, userid, magic,start,end) VALUES (NULL, {user_result[0]}, '{magic}',{start},0)"
+            session_query = f"INSERT INTO session (sessionid, userid, magic, start, end) VALUES (NULL, {user_result[0]}, '{magic}', {start}, 0)"
             do_database_execute(session_query)
 
             # Return user details and the generated magic identifier
@@ -211,7 +203,6 @@ def handle_logout_request(iuser, imagic, parameters):
     else:
         response.append(build_response_message(110, 'User is not logged in'))
 
-
     return ['', '', response]
 
 def handle_location_request(iuser, imagic, content):
@@ -229,7 +220,7 @@ def handle_location_request(iuser, imagic, content):
         locs = do_database_fetchall(loc_query)
 
         for l in locs:
-            response.append(build_response_location(l[0],l[1]))
+            response.append(build_response_location(l[0], l[1]))
 
         response.append(location_response(sessionid))
 
@@ -255,29 +246,29 @@ def handle_add_request(iuser, imagic, content):
   
   else:
 
-    ## a valid session so process the addition of the entry.
+    ## A valid session so process the addition of the entry.
+
     # First check that all the arguments are present
-    
     try:
       location = content['location']
     
     except:
-      response.append(build_response_message(201,"Location field missing from request."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(201, "Location field missing from request."))
+      return [iuser, imagic, response]
 
     try:
       vtype = content['type']
     
     except:
-      response.append(build_response_message(202,"Type field missing from request."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(202, "Type field missing from request."))
+      return [iuser, imagic, response]
 
     try:
       occupancy = content['occupancy']
     
     except:
-      response.append(build_response_message(203,"Occupancy field missing from request."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(203, "Occupancy field missing from request."))
+      return [iuser, imagic, response]
 
     # Then check that they are valid values
     try:
@@ -288,38 +279,37 @@ def handle_add_request(iuser, imagic, content):
       location = loc_result[0] # should fail if we could n't find it.
 
     except:
-      response.append(build_response_message(101,"Location field invalid."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(101, "Location field invalid."))
+      return [iuser, imagic, response]
 
     try:
       vtype = int(vtype)
-      if vtype<1 or vtype>8:
+      if vtype < 1 or vtype > 8:
         raise Exception("Out of range")
     
     except:
-      response.append(build_response_message(102,"Type field invalid."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(102, "Type field invalid."))
+      return [iuser, imagic, response]
 
     try:
       occupancy = int(occupancy)
-      if occupancy<1 or occupancy>4:
+      if occupancy < 1 or occupancy > 4:
         raise Exception("Out of range")
     
     except:
-      response.append(build_response_message(103,"Occupancy field invalid."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(103, "Occupancy field invalid."))
+      return [iuser, imagic, response]
 
     # Everything looks good, so add the record
-
     now = timestamp()
-    add_query = f"INSERT INTO traffic (recordid, sessionid, time, type, locationid, occupancy, mode) VALUES (NULL, {sessionid},{now},{vtype},{location},{occupancy},1)"
+    add_query = f"INSERT INTO traffic (recordid, sessionid, time, type, locationid, occupancy, mode) VALUES (NULL, {sessionid}, {now}, {vtype}, {location}, {occupancy}, 1)"
     do_database_execute(add_query)
-    response.append(build_response_message(0,"Vehicle added for "+loc_result[1]))
+    response.append(build_response_message(0, "Vehicle added for " + loc_result[1]))
 
     # Work out how many vehicles we've seen in this session, regardless of location.
     response.append(location_response(sessionid))
 
-  return [iuser,imagic,response]
+  return [iuser, imagic, response]
 
 
 
@@ -345,24 +335,25 @@ def handle_undo_request(iuser, imagic, content):
       location = content['location']
     
     except:
-      response.append(build_response_message(201,"Location field missing from request."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(201, "Location field missing from request."))
+      return [iuser, imagic, response]
 
     try:
       vtype = content['type']
     
     except:
-      response.append(build_response_message(202,"Type field missing from request."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(202, "Type field missing from request."))
+      return [iuser, imagic, response]
 
     try:
       occupancy = content['occupancy']
     
     except:
-      response.append(build_response_message(203,"Occupancy field missing from request."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(203, "Occupancy field missing from request."))
+      return [iuser, imagic, response]
 
     # Then check that they are valid values
+
     try:
       location = int(location)
 
@@ -371,86 +362,54 @@ def handle_undo_request(iuser, imagic, content):
       location = loc_result[0] # should fail if we could n't find it.
 
     except:
-      response.append(build_response_message(101,"Location field invalid."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(101, "Location field invalid."))
+      return [iuser, imagic, response]
 
     try:
       vtype = int(vtype)
-      if vtype<1 or vtype>8:
+      if vtype < 1 or vtype > 8:
         raise Exception("Out of range")
     
     except:
-      response.append(build_response_message(102,"Type field invalid."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(102, "Type field invalid."))
+      return [iuser, imagic, response]
 
     try:
       occupancy = int(occupancy)
-      if occupancy<1 or occupancy>4:
+      if occupancy < 1 or occupancy > 4:
         raise Exception("Out of range")
     
     except:
-      response.append(build_response_message(103,"Occupancy field invalid."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(103, "Occupancy field invalid."))
+      return [iuser, imagic, response]
     
     # Everything looks good, no check if a record exists to undo, and that it does not have a corresponding undo record.
-
-    add_query = f"SELECT * FROM traffic WHERE sessionid={sessionid} AND type={vtype} AND locationid = {location} AND occupancy = {occupancy} AND mode = 1"
-    add_fetchall = do_database_fetchall(add_query)
-
-    undo_query = f"SELECT * FROM traffic WHERE sessionid={sessionid} AND type={vtype} AND locationid = {location} AND occupancy = {occupancy} AND mode = -1"
-    undo_fetchall = do_database_fetchall(undo_query)
-
-    # Check if there is a record to undo
-    if len(add_fetchall) > len(undo_fetchall):
-        
-        # Count occurrences of each timestamp in add and undo records
-        add_timestamp_counts = {}
-        undo_timestamp_counts = {}
-
-        add_timestamp_counts = Counter(record[2] for record in add_fetchall)
-        undo_timestamp_counts = Counter(record[2] for record in undo_fetchall)
-
-        # Find the earliest add timestamp that has fewer undos than adds
-        for add_timestamp, add_count in add_timestamp_counts.items():
-            undo_count = undo_timestamp_counts.get(add_timestamp, 0)
-            if undo_count < add_count:
-                undo_now = add_timestamp
-                break
-        
-        undo_query = f"INSERT INTO traffic (recordid, sessionid, time, type, locationid, occupancy, mode) VALUES (NULL, {sessionid},{undo_now},{vtype},{location},{occupancy},-1)"
-        do_database_execute(undo_query)
-        response.append(build_response_message(0,"Vehicle undone for " + loc_result[1]))
     
+    undo_query = f"WITH UndoCheck AS (SELECT time FROM traffic WHERE sessionid = {sessionid} AND type = {vtype} AND locationid = {location} AND occupancy = {occupancy} GROUP BY time HAVING SUM(mode) > 0 ORDER BY time DESC LIMIT 1) INSERT INTO traffic (recordid, sessionid, time, type, locationid, occupancy, mode) SELECT NULL, {sessionid}, time, {vtype}, {location}, {occupancy}, -1 FROM UndoCheck RETURNING recordid;"
+
+    result = do_database_fetchone(undo_query)
+
+    # Check if the insert was successful
+    if result:
+        response.append(build_response_message(0, "Vehicle undid for " + loc_result[1]))
+        # Work out how many vehicles we've seen in this session, regardless of location.
+        response.append(location_response(sessionid))
     else:
-      response.append(build_response_message(104,"No record to undo."))
+        response.append(build_response_message(104, "No record to undo."))
+
+    return [iuser, imagic, response]
 
 
-
-    ## CODE NEEDED HERE
-    ##
-    ## Add code here to undo a matching vehicle if one exists.
-    ## Otherwise, report an error that there is no match.
-    ## Undoing does not delete an entry. It adds an equal but opposite entry
-
-    ## check for a valid session, if so process the addition of the entry. DONE
-
-    # First check that all the arguments are present DONE
- 
-    # Then check that they are valid values DONE
-
-    # Update database
-
-    # create response
-
-    return [iuser,imagic,response]
 
 def handle_download_request(iuser, imagic, content):
     """Provide a CSV file of all traffic observations. The data is summarised into one row per date and location pair"""
     sessionid = handle_validate(iuser, imagic)  
+    
     if sessionid == 0:
         return ['', '', ""]
+    
     else:
-	# The CSV header line.
+	    # The CSV header line.
         response = "Date, Location ID, Location Name, Car, Bus, Bicycle, Motorbike, Van, Truck, Taxi, Other\n"
 
 	## CODE NEEDED HERE
@@ -461,50 +420,54 @@ def handle_download_request(iuser, imagic, content):
 
         return [iuser, imagic, response]
 
-
-def handle_summary_request(iuser,imagic,content):
+def handle_summary_request(iuser, imagic, content):
   """This code handles a request for update to the session summary values."""
   response = []
   sessionid = handle_validate(iuser, imagic)
+  
   if (sessionid == 0):
     response.append(build_response_redirect('/login.html'))
-    return ['','',response]
+    return ['', '', response]
+  
   else:
 
     try:
       location = content['location']
+    
     except:
-      response.append(build_response_message(201,"Location field missing from request."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(201, "Location field missing from request."))
+      return [iuser, imagic, response]
 
     try:
       location = int(location)
-
       loc_query = f"SELECT * FROM locations WHERE locationid = {location}"
       loc_result = do_database_fetchone(loc_query)
       location = loc_result[0] # should fail if we could n't find it.
 
     except:
-      response.append(build_response_message(101,"Location field invalid."))
-      return [iuser,imagic, response]
+      response.append(build_response_message(101, "Location field invalid."))
+      return [iuser, imagic, response]
 
-    for loop in range(1,9):
+    for loop in range(1, 9):
 
       result = do_database_fetchone(f"SELECT SUM(mode) FROM traffic WHERE sessionid={sessionid} AND type={loop} AND locationid = {location} GROUP BY mode")
+      
       if result:
           response.append(build_response_vcount(loop, result[0]))
+      
       else:
           response.append(build_response_vcount(loop, 0))
 
     response.append(build_response_message(0, f"Summary compiled for {loc_result[1]}."))
 
-  return [iuser,imagic,response]
+  return [iuser, imagic, response]
 
 
 # HTTPRequestHandler class is extended to include new post and get request handlers
 class myHTTPServer_RequestHandler(BaseHTTPRequestHandler):
 
     # POST This function responds to GET requests to the web server.
+    
     def do_POST(self):
 
         # The set_cookies function adds/updates two cookies returned with a webpage.
@@ -513,13 +476,14 @@ class myHTTPServer_RequestHandler(BaseHTTPRequestHandler):
         def set_cookies(x, user, magic):
             ucookie = Cookie.SimpleCookie()
             ucookie['u_cookie'] = user
-            x.send_header("Set-Cookie", ucookie.output(header='', sep=''))
+            x.send_header("Set-Cookie", ucookie.output(header = '', sep = ''))
             mcookie = Cookie.SimpleCookie()
             mcookie['m_cookie'] = magic
-            x.send_header("Set-Cookie", mcookie.output(header='', sep=''))
+            x.send_header("Set-Cookie", mcookie.output(header = '', sep = ''))
 
         # The get_cookies function returns the values of the user and magic cookies if they exist
         # it returns empty strings if they do not.
+        
         def get_cookies(source):
             rcookies = Cookie.SimpleCookie(source.headers.get('Cookie'))
             user = ''
@@ -527,6 +491,7 @@ class myHTTPServer_RequestHandler(BaseHTTPRequestHandler):
             for keyc, valuec in rcookies.items():
                 if keyc == 'u_cookie':
                     user = valuec.value
+                
                 if keyc == 'm_cookie':
                     magic = valuec.value
             return [user, magic]
@@ -552,8 +517,10 @@ class myHTTPServer_RequestHandler(BaseHTTPRequestHandler):
             length =  int(self.headers.get('Content-Length'))
             scontent = self.rfile.read(length).decode('ascii')
             print(scontent)
+            
             if length > 0 :
               content = json.loads(scontent)
+            
             else:
               content = []
 
@@ -568,26 +535,32 @@ class myHTTPServer_RequestHandler(BaseHTTPRequestHandler):
                     [user, magic, response] = handle_login_request(user_magic[0], user_magic[1], content)
                     #The result of a login attempt will be to set the cookies to identify the session.
                     set_cookies(self, user, magic)
+                
                 elif content['command'] == 'logout':
                     [user, magic, response] = handle_logout_request(user_magic[0], user_magic[1], content)
                     if user == '!': # Check if we've been tasked with discarding the cookies.
                         set_cookies(self, '', '')
+                
                 elif content['command'] == 'add':
                     [user, magic, response] = handle_add_request(user_magic[0], user_magic[1], content)
                     if user == '!': # Check if we've been tasked with discarding the cookies.
                         set_cookies(self, '', '')
+                
                 elif content['command'] == 'undo':
                     [user, magic, response] = handle_undo_request(user_magic[0], user_magic[1], content)
                     if user == '!': # Check if we've been tasked with discarding the cookies.
                         set_cookies(self, '', '')
+                
                 elif content['command'] == 'summary':
-                    [user, magic, response] = handle_summary_request(user_magic[0], user_magic[1],content)
+                    [user, magic, response] = handle_summary_request(user_magic[0], user_magic[1], content)
                     if user == '!': # Check if we've been tasked with discarding the cookies.
                         set_cookies(self, '', '')
+                
                 elif content['command'] == 'location':
-                    [user, magic, response] = handle_location_request(user_magic[0], user_magic[1],content)
+                    [user, magic, response] = handle_location_request(user_magic[0], user_magic[1], content)
                     if user == '!': # Check if we've been tasked with discarding the cookies.
                         set_cookies(self, '', '')
+                
                 else:
                     # The command was not recognised, report that to the user. This uses a special error code that is not part of the codes you will use.
                     response = []
@@ -596,7 +569,7 @@ class myHTTPServer_RequestHandler(BaseHTTPRequestHandler):
             else:
                 # There was no command present, report that to the user. This uses a special error code that is not part of the codes you will use.
                 response = []
-                response.append(build_response_message(902,'Internal Error: Command not found.'))
+                response.append(build_response_message(902, 'Internal Error: Command not found.'))
 
             text = json.dumps(response)
             print(text)
@@ -608,11 +581,13 @@ class myHTTPServer_RequestHandler(BaseHTTPRequestHandler):
             # A file that does n't fit one of the patterns above was requested.
             self.send_response(404) # a file not found html response
             self.end_headers()
+        
         return
 
    # GET This function responds to GET requests to the web server.
    # You should not need to change this function. It deals with all files except /download.csv for which it invokes
    # handle_download_request() which your are responsible for completing.
+    
     def do_GET(self):
 
         # The set_cookies function adds/updates two cookies returned with a webpage.
@@ -621,10 +596,10 @@ class myHTTPServer_RequestHandler(BaseHTTPRequestHandler):
         def set_cookies(x, user, magic):
             ucookie = Cookie.SimpleCookie()
             ucookie['u_cookie'] = user
-            x.send_header("Set-Cookie", ucookie.output(header='', sep=''))
+            x.send_header("Set-Cookie", ucookie.output(header = '', sep = ''))
             mcookie = Cookie.SimpleCookie()
             mcookie['m_cookie'] = magic
-            x.send_header("Set-Cookie", mcookie.output(header='', sep=''))
+            x.send_header("Set-Cookie", mcookie.output(header = '', sep = ''))
 
         # The get_cookies function returns the values of the user and magic cookies if they exist
         # it returns empty strings if they do not.
@@ -654,7 +629,7 @@ class myHTTPServer_RequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'text/css')
             self.end_headers()
-            with open('.'+self.path, 'rb') as file:
+            with open('.' + self.path, 'rb') as file:
                 self.wfile.write(file.read())
 
         # Return a Javascript file.
@@ -663,7 +638,7 @@ class myHTTPServer_RequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'text/js')
             self.end_headers()
-            with open('.'+self.path, 'rb') as file:
+            with open('.' + self.path, 'rb') as file:
                 self.wfile.write(file.read())
 
         # A special case of '/' means return the index.html (homepage)
@@ -681,7 +656,7 @@ class myHTTPServer_RequestHandler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
-                with open('./pages'+parsed_path.path, 'rb') as file:
+                with open('./pages' + parsed_path.path, 'rb') as file:
                     self.wfile.write(file.read())
             except:
                 # The names file has not been found
@@ -712,12 +687,14 @@ def run():
     # When testing you should supply a command line argument in the 8081+ range
 
     # Changing code below this line may break the test environment. There is no good reason to do so.
-    if(len(sys.argv)<2): # Check we were given both the script name and a port number
+    if(len(sys.argv) < 2): # Check we were given both the script name and a port number
         print("Port argument not provided.")
+        
         return
+    
     server_address = ('127.0.0.1', int(sys.argv[1]))
     httpd = HTTPServer(server_address, myHTTPServer_RequestHandler)
-    print('running server on port =',sys.argv[1],'...')
+    print('running server on port =', sys.argv[1], '...')
     httpd.serve_forever() # This function will not return until the server is aborted.
 
 run()
