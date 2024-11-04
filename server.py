@@ -7,7 +7,6 @@ import random                                              # Generate random num
 import time                                                # Needed to record when stuff happened
 import json                                                # Support for json encoding
 import sys                                                 # Needed for agument handling
-from collections import Counter                            # For counting occurances of values
 
 
 
@@ -385,12 +384,17 @@ def handle_undo_request(iuser, imagic, content):
     
     # Everything looks good, no check if a record exists to undo, and that it does not have a corresponding undo record.
     
-    undo_query = f"WITH UndoCheck AS (SELECT time FROM traffic WHERE sessionid = {sessionid} AND type = {vtype} AND locationid = {location} AND occupancy = {occupancy} GROUP BY time HAVING SUM(mode) > 0 ORDER BY time DESC LIMIT 1) INSERT INTO traffic (recordid, sessionid, time, type, locationid, occupancy, mode) SELECT NULL, {sessionid}, time, {vtype}, {location}, {occupancy}, -1 FROM UndoCheck RETURNING recordid;"
+    undo_query = f"""
+      WITH UndoCheck AS (SELECT time FROM traffic WHERE sessionid = {sessionid} AND type = {vtype} AND locationid = {location} AND occupancy = {occupancy} 
+      GROUP BY time HAVING SUM(mode) > 0 ORDER BY time DESC LIMIT 1) 
+      INSERT INTO traffic (recordid, sessionid, time, type, locationid, occupancy, mode) 
+      SELECT NULL, {sessionid}, time, {vtype}, {location}, {occupancy}, -1 FROM UndoCheck RETURNING recordid;
+      """
 
-    result = do_database_fetchone(undo_query)
+    undo_result = do_database_fetchone(undo_query)
 
     # Check if the insert was successful
-    if result:
+    if undo_result:
         response.append(build_response_message(0, "Vehicle undid for " + loc_result[1]))
         # Work out how many vehicles we've seen in this session, regardless of location.
         response.append(location_response(sessionid))
@@ -407,25 +411,42 @@ def handle_download_request(iuser, imagic, content):
     
     if sessionid == 0:
         return ['', '', ""]
-    
     else:
-	    # The CSV header line.
+	# The CSV header line.
         response = "Date, Location ID, Location Name, Car, Bus, Bicycle, Motorbike, Van, Truck, Taxi, Other\n"
+        
+        download_query = f"""
+          SELECT strftime('%F', t.time, 'unixepoch') AS Date, l.locationid AS LocationID, l.name AS LocationName,
+          SUM(CASE WHEN t.type = 1 THEN t.mode ELSE 0 END) AS Car,
+          SUM(CASE WHEN t.type = 2 THEN t.mode ELSE 0 END) AS Bus,
+          SUM(CASE WHEN t.type = 3 THEN t.mode ELSE 0 END) AS Bicycle,
+          SUM(CASE WHEN t.type = 4 THEN t.mode ELSE 0 END) AS Motorbike,
+          SUM(CASE WHEN t.type = 5 THEN t.mode ELSE 0 END) AS Van,
+          SUM(CASE WHEN t.type = 6 THEN t.mode ELSE 0 END) AS Truck,
+          SUM(CASE WHEN t.type = 7 THEN t.mode ELSE 0 END) AS Taxi,
+          SUM(CASE WHEN t.type = 8 THEN t.mode ELSE 0 END) AS Other
+          FROM traffic AS t
+          LEFT JOIN locations AS l ON t.locationid = l.locationid
+          GROUP BY strftime('%F', t.time, 'unixepoch'), t.locationid, l.name
+          ORDER BY strftime('%F', t.time, 'unixepoch') ASC, "LocationID" ASC;
+          """
 
-	## CODE NEEDED HERE
-        ##
-        ## Provide one line for each (day, location) pair of all the vehicles of each type observed by any user.
-        ## It should be sorted first by day, earliest first. And then by Location ID, lowest first. 
-        ##
+        download_result = do_database_fetchall(download_query)
+
+        for row in download_result:
+            response += ",".join(map(str, row)) + "\n"
 
         return [iuser, imagic, response]
+
+  
+
 
 def handle_summary_request(iuser, imagic, content):
   """This code handles a request for update to the session summary values."""
   response = []
   sessionid = handle_validate(iuser, imagic)
   
-  if (sessionid == 0):
+  if sessionid == 0:
     response.append(build_response_redirect('/login.html'))
     return ['', '', response]
   
@@ -450,8 +471,10 @@ def handle_summary_request(iuser, imagic, content):
 
     for loop in range(1, 9):
 
-      result = do_database_fetchone(f"SELECT SUM(mode) FROM traffic WHERE sessionid={sessionid} AND type={loop} AND locationid = {location} GROUP BY mode")
+      #result = do_database_fetchone(f"SELECT SUM(mode) FROM traffic WHERE sessionid={sessionid} AND type={loop} AND locationid = {location} GROUP BY mode")
       
+      result = do_database_fetchone(f"SELECT SUM(mode) FROM traffic WHERE sessionid = {sessionid} AND type = {loop} AND locationid = {location} GROUP BY sessionid, type, locationid")
+
       if result:
           response.append(build_response_vcount(loop, result[0]))
       
