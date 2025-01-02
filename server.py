@@ -491,7 +491,7 @@ def handle_summary_request(iuser, imagic, content):
             loc_query = f"""SELECT * FROM locations WHERE locationid = {
                 location}"""
             loc_result = do_database_fetchone(loc_query)
-            location = loc_result[0]  # should fail if we could n't find it.
+            location = loc_result[0]  # should fail if we couldn't find it.
 
         except:
             response.append(build_response_message(
